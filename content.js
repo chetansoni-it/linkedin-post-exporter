@@ -69,6 +69,17 @@
         content = longestText;
         if (!content) return;
 
+        /* ================= EMAIL EXTRACTION ================= */
+        let emails = "";
+
+        const emailMatches = content.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
+        if (emailMatches) {
+            const uniqueEmails = [...new Set(
+                emailMatches.map(e => e.toLowerCase())
+            )];
+            emails = uniqueEmails.join(", ");
+        }
+
         /* ================= POST URL ================= */
         let url = "";
         const linkEl = post.querySelector("a[href*='/posts/'], a[href*='/feed/update/']");
@@ -92,16 +103,21 @@
             "send resume",
             "share resume",
             "email your resume",
-            "Job Title"
+            "job title"
         ];
 
-        const hasEmail = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(content);
-        const isJob = jobKeywords.some(k => content.toLowerCase().includes(k)) || hasEmail;
+        const isJob =
+            jobKeywords.some(k => content.toLowerCase().includes(k)) ||
+            emails.length > 0;
+
+        // 🚀 Ignore NON-JOB posts completely
+        if (!isJob) return;
 
         results.push({
             author,
             timestamp,
-            post_type: isJob ? "JOB_POST" : "NORMAL_POST",
+            // post_type: "JOB_POST",
+            emails,
             content,
             url
         });
