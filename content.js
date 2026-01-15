@@ -74,10 +74,17 @@
 
         const emailMatches = content.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
         if (emailMatches) {
-            const uniqueEmails = [...new Set(
-                emailMatches.map(e => e.toLowerCase())
-            )];
+            const uniqueEmails = [...new Set(emailMatches.map(e => e.toLowerCase()))];
             emails = uniqueEmails.join(", ");
+        }
+
+        /* ================= APPLY LINKS ================= */
+        let apply_links = "";
+
+        const linkMatches = content.match(/https?:\/\/[^\s)]+/gi);
+        if (linkMatches) {
+            const uniqueLinks = [...new Set(linkMatches)];
+            apply_links = uniqueLinks.join(", ");
         }
 
         /* ================= POST URL ================= */
@@ -108,9 +115,10 @@
 
         const isJob =
             jobKeywords.some(k => content.toLowerCase().includes(k)) ||
-            emails.length > 0;
+            emails.length > 0 ||
+            apply_links.length > 0;
 
-        // 🚀 Ignore NON-JOB posts completely
+        // 🚀 Ignore non-job posts
         if (!isJob) return;
 
         results.push({
@@ -118,6 +126,7 @@
             timestamp,
             // post_type: "JOB_POST",
             emails,
+            apply_links,
             content,
             url
         });
