@@ -1,11 +1,9 @@
 {
     "manifest_version": 3,
-    "name": "LinkedIn Post Exporter (Safe)",
-    "version": "1.0.0",
-    "description": "Export visible LinkedIn search posts to CSV (manual & safe)",
+    "name": "LinkedIn Job Exporter",
+    "version": "1.1",
     "permissions": [
-        "activeTab",
-        "scripting",
+        "tabs",
         "downloads"
     ],
     "host_permissions": [
@@ -16,5 +14,15 @@
     },
     "background": {
         "service_worker": "background.js"
-    }
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.linkedin.com/*"
+            ],
+            "js": [
+                "content.js"
+            ]
+        }
+    ]
 }

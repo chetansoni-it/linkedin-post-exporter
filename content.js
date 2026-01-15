@@ -1,5 +1,48 @@
-(function () {
-    const MAX_POSTS = 100;
+chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === "START_SCAN") {
+        startScan(msg.limit || 100);
+    }
+
+    if (msg.type === "EXPORT_VISIBLE") {
+        extractJobs(999999); // export whatever is visible
+    }
+});
+
+async function startScan(limit) {
+    await autoScroll(limit);
+    extractJobs(limit);
+}
+
+/* ================= AUTO SCROLL ================= */
+
+async function autoScroll(limit) {
+    let last = 0;
+    let stuck = 0;
+
+    while (true) {
+        window.scrollBy(0, window.innerHeight);
+        await sleep(1500 + Math.random() * 1000);
+
+        const count = document.querySelectorAll("div.feed-shared-update-v2").length;
+        if (count >= limit) break;
+
+        if (count === last) {
+            stuck++;
+            if (stuck >= 3) break;
+        } else {
+            stuck = 0;
+        }
+        last = count;
+    }
+}
+
+function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+}
+
+/* ================= EXTRACTION ================= */
+
+function extractJobs(MAX_POSTS) {
     const seen = new Set();
     const results = [];
 
@@ -8,152 +51,120 @@
     posts.forEach(post => {
         if (results.length >= MAX_POSTS) return;
 
-        /* ================= AUTHOR ================= */
+        /* ========= AUTHOR (FINAL, FIXED) ========= */
         let author = "Unknown";
 
-        const headerRoot =
-            post.closest("li") ||
-            post.parentElement ||
-            post;
+        const headerRoot = post.closest("li") || post;
+        const authorSpans = headerRoot.querySelectorAll("span[aria-hidden='true']");
 
-        const authorAriaSpans = headerRoot.querySelectorAll("span[aria-hidden='true']");
-
-        for (const span of authorAriaSpans) {
-            const text = span.innerText.replace(/\s+/g, " ").trim();
+        for (const span of authorSpans) {
+            const text = span.innerText
+                .replace(/\s+/g, " ")
+                .trim();
 
             if (
                 text.length >= 3 &&
                 text.length <= 50 &&
-                !/\b(h|hr|hrs|hour|hours|d|day|days)\b/i.test(text) &&
                 !text.includes("•") &&
-                !text.includes("Visible") &&
-                !text.match(/^\d+$/)
+                !/^\d/.test(text) &&                 // not starting with number
+                !/\b(h|hr|hrs|hour|hours|day|days|w)\b/i.test(text) &&
+                !text.includes("Edited") &&
+                !text.includes("Visible")
             ) {
                 author = text;
-                break;
+                break; // 🔥 THIS WAS MISSING
             }
         }
 
-        /* ================= TIMESTAMP ================= */
+        /* ========= TIMESTAMP ========= */
         let timestamp = "Unknown";
+        post.querySelectorAll("span[aria-hidden='true']").forEach(span => {
+            const m = span.innerText.trim().match(/^(\d+\s?[hdw])/i);
+            if (m) timestamp = m[1].replace(" ", "");
+        });
 
-        const timeAriaSpans = post.querySelectorAll("span[aria-hidden='true']");
-
-        for (const span of timeAriaSpans) {
-            const text = span.innerText.replace(/\s+/g, " ").trim();
-            const match = text.match(/^(\d+\s?[hdw])/i);
-            if (match) {
-                timestamp = match[1].replace(" ", "");
-                break;
-            }
-        }
-
-        /* ================= CONTENT ================= */
+        /* ========= CONTENT ========= */
         let content = "";
-        let longestText = "";
+        let longest = "";
 
-        const textSpans = post.querySelectorAll("span[dir='ltr']");
-
-        for (const span of textSpans) {
-            const text = span.innerText
-                .replace(/\s+\n/g, "\n")
-                .replace(/\n+/g, "\n")
-                .replace(/\s+/g, " ")
-                .trim();
-
-            if (text.length > longestText.length && text.length > 80) {
-                longestText = text;
+        post.querySelectorAll("span[dir='ltr']").forEach(span => {
+            const t = span.innerText.replace(/\s+/g, " ").trim();
+            if (t.length > longest.length && t.length > 80) {
+                longest = t;
             }
-        }
+        });
 
-        content = longestText;
+        content = longest;
         if (!content) return;
 
-        /* ================= EMAIL EXTRACTION ================= */
+        /* ========= EMAILS ========= */
         let emails = "";
-
         const emailMatches = content.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
         if (emailMatches) {
-            const uniqueEmails = [...new Set(emailMatches.map(e => e.toLowerCase()))];
-            emails = uniqueEmails.join(", ");
+            emails = [...new Set(emailMatches.map(e => e.toLowerCase()))].join(", ");
         }
 
-        /* ================= APPLY LINKS ================= */
+        /* ========= CONTACT NUMBERS ========= */
+        let contact_numbers = "";
+
+        const phoneMatches = content.match(/(\+?\d[\d\s\-()]{7,}\d)/g);
+        if (phoneMatches) {
+            const cleaned = phoneMatches
+                .map(p => p.replace(/\s+/g, " ").trim())
+                .filter(p => p.length >= 8);
+
+            contact_numbers = [...new Set(cleaned)].join(", ");
+        }
+
+        /* ========= APPLY LINKS ========= */
         let apply_links = "";
-
-        const linkMatches = content.match(/https?:\/\/[^\s)]+/gi);
-        if (linkMatches) {
-            const uniqueLinks = [...new Set(linkMatches)];
-            apply_links = uniqueLinks.join(", ");
+        const links = content.match(/https?:\/\/[^\s)]+/gi);
+        if (links) {
+            apply_links = [...new Set(links)].join(", ");
         }
 
-        /* ================= POST URL ================= */
-        let url = "";
-        const linkEl = post.querySelector("a[href*='/posts/'], a[href*='/feed/update/']");
-        if (linkEl) url = linkEl.href.split("?")[0];
-
-        /* ================= DEDUP ================= */
-        const key = url + content.slice(0, 150);
-        if (seen.has(key)) return;
-        seen.add(key);
-
-        /* ================= JOB CLASSIFICATION ================= */
-        const jobKeywords = [
-            "hiring",
-            "we are hiring",
-            "job opening",
-            "apply",
-            "urgent hiring",
-            "looking for",
-            "vacancy",
-            "open position",
-            "send resume",
-            "share resume",
-            "email your resume",
-            "job title"
-        ];
-
+        /* ========= JOB FILTER ========= */
         const isJob =
-            jobKeywords.some(k => content.toLowerCase().includes(k)) ||
+            /hiring|job|apply|vacancy/i.test(content) ||
             emails.length > 0 ||
             apply_links.length > 0;
 
-        // 🚀 Ignore non-job posts
         if (!isJob) return;
+
+        /* ========= DEDUP ========= */
+        const key = author + timestamp + content.slice(0, 120);
+        if (seen.has(key)) return;
+        seen.add(key);
 
         results.push({
             author,
             timestamp,
-            // post_type: "JOB_POST",
             emails,
+            contact_numbers,
             apply_links,
-            content,
-            url
+            content
         });
     });
 
     if (!results.length) {
-        alert("No valid posts found. Scroll more and try again.");
+        alert("No job posts found.");
         return;
     }
 
-    const csv = convertToCSV(results);
-    downloadCSV(csv);
-})();
+    sendCSV(results);
+}
 
-/* ================= CSV HELPERS ================= */
+/* ================= CSV ================= */
 
-function convertToCSV(data) {
+function sendCSV(data) {
     const headers = Object.keys(data[0]).join(",");
     const rows = data.map(row =>
         Object.values(row)
             .map(v => `"${String(v).replace(/"/g, '""')}"`)
             .join(",")
     );
-    return [headers, ...rows].join("\n");
-}
 
-function downloadCSV(csv) {
+    const csv = [headers, ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
 
