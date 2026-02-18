@@ -9,7 +9,8 @@
         "downloads"
     ],
     "host_permissions": [
-        "https://www.linkedin.com/*"
+        "https://www.linkedin.com/*",
+        "http://localhost:8000/*"
     ],
     "action": {
         "default_popup": "popup.html"
@@ -23,6 +24,7 @@
                 "https://www.linkedin.com/*"
             ],
             "js": [
+                "config.js",
                 "content.js"
             ]
         }
