@@ -4,67 +4,40 @@
 <head>
     <meta charset="UTF-8" />
     <title>LinkedIn Job Export</title>
-
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            width: 260px;
-            padding: 12px;
-        }
-
-        input,
-        button {
-            width: 100%;
-            margin-top: 8px;
-            padding: 8px;
-            font-size: 14px;
-        }
-
-        #status {
-            font-size: 12px;
-            margin-top: 10px;
-            color: #555;
-        }
-
-        .footer {
-            margin-top: 15px;
-            padding-top: 10px;
-            border-top: 1px solid #ddd;
-            font-size: 11px;
-            text-align: center;
-            color: #666;
-        }
-
-        .footer a {
-            color: #0073b1;
-            text-decoration: none;
-        }
-
-        .footer a:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <link rel="stylesheet" href="popup.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
-    <h3>LinkedIn Job Export</h3>
+    <div class="card">
+        <header>
+            <h3>
+                LinkedIn Job Export
+            </h3>
+        </header>
 
-    <button id="exportVisible">Export Visible Posts</button>
+        <div class="control-group">
+            <button id="exportVisible" class="btn-secondary">Export Visible Posts</button>
+        </div>
 
-    <hr />
+        <div class="divider"></div>
 
-    <label>Auto-scan posts</label>
-    <input id="limit" type="number" value="100" min="20" step="20" />
+        <div class="control-group">
+            <label for="limit">Auto-scan Limit</label>
+            <div class="input-wrapper">
+                <input id="limit" type="number" value="100" min="20" step="20" placeholder="Number of posts" />
+            </div>
+            <button id="startScan" class="btn-primary">Auto Scan & Export</button>
+        </div>
 
-    <button id="startScan">Auto Scan & Export</button>
+        <div id="status"></div>
 
-    <div id="status"></div>
-
-    <div class="footer">
-        <p>Copyright &copy; 2026 Chetan Soni</p>
-        <p>
-            <a href="https://chetansoni-it.github.io/chetansoni-it/" target="_blank">View Profile</a>
-        </p>
+        <div class="footer">
+            <p>Copyright &copy; 2026 Chetan Soni</p>
+            <p>
+                <a href="https://chetansoni-it.github.io/chetansoni-it/" target="_blank">View Profile</a>
+            </p>
+        </div>
     </div>
 
     <script src="popup.js"></script>
