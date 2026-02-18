@@ -1,0 +1,3 @@
+[submodule "send-email"]
+	path = send-email
+	url = https://github.com/chetansoni-it/send-email
