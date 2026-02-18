@@ -2,6 +2,8 @@
     "manifest_version": 3,
     "name": "LinkedIn Job Exporter",
     "version": "1.1",
+    "author": "Chetan Soni",
+    "homepage_url": "https://chetansoni-it.github.io/chetansoni-it/",
     "permissions": [
         "tabs",
         "downloads"

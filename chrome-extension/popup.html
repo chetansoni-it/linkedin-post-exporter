@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>LinkedIn Job Export</title>
+    <link rel="stylesheet" href="popup.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="card">
+        <header>
+            <h3>
+                LinkedIn Job Export
+            </h3>
+        </header>
+
+        <div class="control-group">
+            <button id="exportVisible" class="btn-secondary">Export Visible Posts</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="control-group">
+            <label for="limit">Auto-scan Limit</label>
+            <div class="input-wrapper">
+                <input id="limit" type="number" value="100" min="20" step="20" placeholder="Number of posts" />
+            </div>
+            <button id="startScan" class="btn-primary">Auto Scan & Export</button>
+        </div>
+
+        <div id="status"></div>
+
+        <div class="footer">
+            <p>Copyright &copy; 2026 Chetan Soni</p>
+            <p>
+                <a href="https://chetansoni-it.github.io/chetansoni-it/" target="_blank">View Profile</a>
+            </p>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>
