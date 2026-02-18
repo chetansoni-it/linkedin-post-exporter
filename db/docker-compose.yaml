@@ -1,0 +1,64 @@
+# version: "3.8"
+services:
+  db:
+    container_name: postgres_container
+    image: postgres:18.1-alpine3.23 # Note: Ensure your version supports the command below
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: test_db
+    ports:
+      - "5432:5432"
+    # CRITICAL: This enables the tracking of query performance
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  pghero:
+    container_name: pghero_container
+    image: ankane/pghero:v3.7.0
+    restart: always
+    environment:
+      # Format: postgres://USER:PASSWORD@DB_HOST:PORT/DB_NAME
+      DATABASE_URL: postgres://root:root@db:5432/test_db
+    ports:
+      - "8080:8080"
+    networks:
+      - internal
+    depends_on:
+      - db
+
+  pgadmin:
+    container_name: pgadmin4_container
+    image: dpage/pgadmin4:9.11.0
+    restart: always
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "5050:80"
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pgadmin-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ./data/pgadmin-data
+      o: bind
+  db-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ./data/db-data
+      o: bind
