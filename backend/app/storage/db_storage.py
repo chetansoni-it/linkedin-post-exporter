@@ -2,7 +2,7 @@
 PostgreSQL storage backend using SQLAlchemy.
 
 Handles reading, writing, and deduplication for LinkedIn posts
-and email statuses stored in the database.
+stored in the database.
 """
 
 from datetime import datetime, timezone
@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from app.database.connection import LinkedInPost, EmailStatus
+from app.database.connection import LinkedInPost
 
 
 # ========================
@@ -46,38 +46,23 @@ def save_posts(db: Session, posts: list[dict]) -> int:
     return count
 
 
-# ========================
-#  Email Status — Read / Write / Check
-# ========================
+def get_all_posts(db: Session) -> list[dict]:
+    """Reads all posts from the database and returns them as a list of dicts."""
+    stmt = select(LinkedInPost).order_by(LinkedInPost.id)
+    results = db.execute(stmt).scalars().all()
 
-def get_email_status(db: Session, recipient_email: str) -> EmailStatus | None:
-    """Retrieves the current email status record for a given recipient."""
-    stmt = select(EmailStatus).where(
-        EmailStatus.recipient_email == recipient_email.strip().lower()
-    )
-    return db.execute(stmt).scalar_one_or_none()
+    posts = []
+    for row in results:
+        posts.append({
+            "author": row.author,
+            "timestamp": row.timestamp,
+            "emails": row.emails,
+            "contact_numbers": row.contact_numbers,
+            "apply_links": row.apply_links,
+            "content": row.content,
+            "content_hash": row.content_hash,
+            "batch_number": row.batch_number,
+            "created_at": str(row.created_at) if row.created_at else "",
+        })
 
-
-def save_email_status(db: Session, data: dict) -> None:
-    """Inserts or updates an email status record (upsert logic)."""
-    recipient = data["recipient_email"].strip().lower()
-    existing = get_email_status(db, recipient)
-
-    if existing:
-        # Update existing record
-        existing.status = data["status"]
-        existing.author = data.get("author", existing.author)
-        existing.error_message = data.get("error_message")
-        existing.updated_at = datetime.now(timezone.utc)
-    else:
-        # Insert new record
-        record = EmailStatus(
-            recipient_email=recipient,
-            status=data["status"],
-            author=data.get("author", ""),
-            error_message=data.get("error_message"),
-            updated_at=datetime.now(timezone.utc),
-        )
-        db.add(record)
-
-    db.commit()
+    return posts

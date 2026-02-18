@@ -5,7 +5,8 @@ Entry point for the application. This backend:
   - Accepts scraped LinkedIn data from the Chrome extension
   - Stores data in CSV and/or PostgreSQL (configurable via app/config.py)
   - Tracks email delivery statuses
-  - Does NOT auto-trigger emails (unlike ./send-email/)
+  - Sends emails with resume attachments (triggered via API, not automatic)
+  - All secrets loaded from .env file
 """
 
 from contextlib import asynccontextmanager
@@ -13,7 +14,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import STORE_IN_DB, STORE_IN_CSV
+from app.config import STORE_IN_DB, STORE_IN_CSV, SENDER_EMAIL
 from app.database.connection import init_db
 from app.routes.posts import router as posts_router
 
@@ -41,9 +42,12 @@ async def lifespan(app: FastAPI):
 
     print("=" * 60)
     print("  Server is ready. Endpoints:")
-    print("    POST /posts          — Receive scraped LinkedIn posts")
-    print("    POST /email-status   — Record email delivery status")
-    print("    GET  /health         — Health check")
+    print("    POST /posts             — Receive scraped LinkedIn posts")
+    print("    POST /trigger-emails    — Start background email job ★")
+    print("    GET  /email-job-status  — Check email job progress")
+    print("    POST /send-emails       — Send to provided list (WebUI)")
+    print("    GET  /health            — Health check")
+    print("  Email sender:", SENDER_EMAIL or "⚠ Not configured (set SENDER_EMAIL in .env)")
     print("=" * 60)
 
     yield

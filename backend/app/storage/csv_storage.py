@@ -10,7 +10,7 @@ import os
 import hashlib
 from datetime import datetime, timezone
 
-from app.config import CSV_DIR, CSV_POSTS_FILE, CSV_EMAIL_STATUS_FILE
+from app.config import CSV_DIR, CSV_POSTS_FILE
 
 
 # ========================
@@ -20,16 +20,11 @@ from app.config import CSV_DIR, CSV_POSTS_FILE, CSV_EMAIL_STATUS_FILE
 # Resolve paths relative to the backend/ root
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 POSTS_CSV_PATH = os.path.join(_BASE_DIR, CSV_DIR, CSV_POSTS_FILE)
-EMAIL_STATUS_CSV_PATH = os.path.join(_BASE_DIR, CSV_DIR, CSV_EMAIL_STATUS_FILE)
 
 # CSV column headers
 POSTS_HEADERS = [
     "author", "timestamp", "emails", "contact_numbers",
     "apply_links", "content", "content_hash", "batch_number", "created_at",
-]
-
-EMAIL_STATUS_HEADERS = [
-    "recipient_email", "status", "author", "error_message", "updated_at",
 ]
 
 
@@ -104,36 +99,18 @@ def save_posts(posts: list[dict]) -> int:
     return count
 
 
-# ========================
-#  Email Status — Read / Write / Check
-# ========================
-
-def get_existing_email_statuses() -> dict[str, str]:
-    """Returns a dict of {recipient_email: status} from the CSV."""
-    statuses: dict[str, str] = {}
-    _ensure_file(EMAIL_STATUS_CSV_PATH, EMAIL_STATUS_HEADERS)
+def get_all_posts() -> list[dict]:
+    """Reads all posts from the CSV and returns them as a list of dicts."""
+    _ensure_file(POSTS_CSV_PATH, POSTS_HEADERS)
+    posts = []
 
     try:
-        with open(EMAIL_STATUS_CSV_PATH, "r", newline="", encoding="utf-8-sig") as f:
+        with open(POSTS_CSV_PATH, "r", newline="", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                email = row.get("recipient_email", "").strip().lower()
-                if email:
-                    statuses[email] = row.get("status", "")
+                posts.append(dict(row))
     except Exception as e:
-        print(f"[CSV] Warning: Could not read {EMAIL_STATUS_CSV_PATH}: {e}")
+        print(f"[CSV] Warning: Could not read {POSTS_CSV_PATH}: {e}")
 
-    return statuses
+    return posts
 
-
-def save_email_status(data: dict) -> None:
-    """Appends an email status row to the CSV.
-
-    For simplicity, appends a new row each time. The latest row for a given email
-    is considered the current status (last-write-wins).
-    """
-    _ensure_file(EMAIL_STATUS_CSV_PATH, EMAIL_STATUS_HEADERS)
-
-    with open(EMAIL_STATUS_CSV_PATH, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=EMAIL_STATUS_HEADERS)
-        writer.writerow(data)

@@ -1,10 +1,13 @@
 """
-API routes for LinkedIn post data and email status tracking.
+API routes for LinkedIn post data, email status tracking, and email sending.
 
 Endpoints:
-  POST /posts           — Receive a batch of scraped LinkedIn posts
-  POST /email-status    — Record an email delivery status update
-  GET  /health          — Health check with storage configuration info
+  POST /posts              — Receive a batch of scraped LinkedIn posts
+
+  POST /send-emails        — Send emails to a provided list (for future WebUI)
+  POST /trigger-emails     — Start background email job from stored data
+  GET  /email-job-status   — Check progress of background email job
+  GET  /health             — Health check with storage configuration info
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -16,13 +19,16 @@ from app.database.connection import get_db
 from app.models.schemas import (
     PostBatchRequest,
     PostBatchResponse,
-    EmailStatusUpdate,
-    EmailStatusResponse,
     HealthResponse,
+    SendEmailRequest,
+    SendEmailResponse,
+    TriggerEmailResponse,
+    EmailJobStatusResponse,
 )
+from app.services.email import send_email_to_recipients, validate_email_config
+from app.services.email_job import trigger_email_job, get_job_status
 from app.services.storage import (
     process_post_batch,
-    process_email_status,
     validate_storage_enabled,
 )
 
@@ -90,32 +96,108 @@ async def receive_posts(
     )
 
 
+
+
 # ========================
-#  POST /email-status
+#  POST /send-emails
 # ========================
 
-@router.post("/email-status", response_model=EmailStatusResponse)
-async def update_email_status(
-    update: EmailStatusUpdate,
-    db: Session | None = Depends(get_optional_db),
-):
+@router.post("/send-emails", response_model=SendEmailResponse)
+async def send_emails(payload: SendEmailRequest):
     """
-    Records an email delivery status update.
+    Sends emails to the provided list of recipients.
 
-    Accepts statuses like 'sent', 'failed', 'bounced', 'delivered'
-    and stores them in the enabled backends.
+    - Uses template from template/email_body.txt (Subject on line 1, body below)
+    - Attaches all files from resume/ directory (PDF, DOCX, etc.)
+    - Checks sent-mails/sent-mails.csv for duplicates & company-domain matches
+    - Logs successful sends to sent-mails/sent-mails.csv
+    - Credentials loaded from .env (SENDER_EMAIL, SENDER_PASSWORD)
     """
-    error = validate_storage_enabled()
-    if error:
-        raise HTTPException(status_code=503, detail=error)
+    # Validate email config
+    config_error = validate_email_config()
+    if config_error:
+        raise HTTPException(status_code=503, detail=config_error)
 
-    result = process_email_status(update=update, db=db)
+    if not payload.emails:
+        return SendEmailResponse(
+            status="ok",
+            message="No emails provided.",
+            sent=0,
+            failed=0,
+        )
 
-    return EmailStatusResponse(
-        status="ok",
-        message=f"Email status for '{result['recipient_email']}' recorded as '{result['status']}'.",
-        recipient_email=result["recipient_email"],
+    # Build metadata from request
+    metadata = {
+        "author": payload.author,
+        "content": payload.content,
+        "contact_numbers": payload.contact_numbers,
+        "apply_links": payload.apply_links,
+    }
+
+    result = send_email_to_recipients(
+        emails=payload.emails,
+        metadata=metadata,
+        skip_duplicates=payload.skip_duplicates,
     )
+
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["error"])
+
+    return SendEmailResponse(
+        status="ok",
+        message=result.get("message", "Emails processed."),
+        sent=result["sent"],
+        failed=result["failed"],
+        failed_details=result.get("failed_details", []),
+        duplicates_skipped=result.get("duplicates_skipped", 0),
+        company_matches_skipped=result.get("company_matches_skipped", 0),
+    )
+
+
+# ========================
+#  POST /trigger-emails
+# ========================
+
+@router.post("/trigger-emails", response_model=TriggerEmailResponse)
+async def trigger_emails():
+    """
+    Starts the background email sending job.
+
+    Reads all stored posts from CSV/DB, extracts emails,
+    deduplicates against sent-mails log, and sends emails in background.
+    Returns immediately — check GET /email-job-status for progress.
+    """
+    result = trigger_email_job()
+
+    if result.get("error"):
+        raise HTTPException(status_code=503, detail=result["error"])
+
+    return TriggerEmailResponse(
+        status="ok",
+        message=result["message"],
+    )
+
+
+# ========================
+#  GET /email-job-status
+# ========================
+
+@router.get("/email-job-status", response_model=EmailJobStatusResponse)
+async def email_job_status():
+    """
+    Returns the current (or last) background email job status.
+
+    Includes: phase, progress, sent/failed counts, current email being sent.
+    """
+    job = get_job_status()
+
+    if job is None:
+        return EmailJobStatusResponse(
+            status="idle",
+            message="No email job has been triggered yet. Use POST /trigger-emails to start.",
+        )
+
+    return EmailJobStatusResponse(**job)
 
 
 # ========================

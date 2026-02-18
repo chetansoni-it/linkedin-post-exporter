@@ -29,16 +29,6 @@ class PostBatchRequest(BaseModel):
     posts: list[LinkedInPostData] = Field(description="List of scraped LinkedIn posts")
 
 
-# ========================
-#  Email Status Tracking
-# ========================
-
-class EmailStatusUpdate(BaseModel):
-    """Payload for tracking email delivery status updates."""
-    recipient_email: str = Field(description="The email address the message was sent to")
-    status: str = Field(description="Delivery status: 'sent', 'failed', 'bounced', 'delivered'")
-    author: str = Field(default="", description="LinkedIn post author for reference")
-    error_message: Optional[str] = Field(default=None, description="Error details if status is 'failed'")
 
 
 # ========================
@@ -55,11 +45,6 @@ class PostBatchResponse(BaseModel):
     duplicates_skipped: int
 
 
-class EmailStatusResponse(BaseModel):
-    """Response returned after processing an email status update."""
-    status: str
-    message: str
-    recipient_email: str
 
 
 class HealthResponse(BaseModel):
@@ -68,3 +53,57 @@ class HealthResponse(BaseModel):
     storage_csv: bool
     storage_db: bool
     timestamp: str
+
+
+# ========================
+#  Email Sending
+# ========================
+
+class SendEmailRequest(BaseModel):
+    """Request to send emails to a list of recipients."""
+    emails: list[str] = Field(description="List of recipient email addresses")
+    skip_duplicates: bool = Field(default=True, description="Skip already-contacted emails")
+    author: str = Field(default="", description="LinkedIn post author for reference in email body")
+    content: str = Field(default="", description="LinkedIn post content for reference")
+    contact_numbers: str = Field(default="", description="Contact numbers from LinkedIn post")
+    apply_links: str = Field(default="", description="Apply links from LinkedIn post")
+
+
+class SendEmailResponse(BaseModel):
+    """Response after attempting to send emails."""
+    status: str
+    message: str
+    sent: int
+    failed: int
+    failed_details: list[dict] = Field(default_factory=list)
+    duplicates_skipped: int = Field(default=0)
+    company_matches_skipped: int = Field(default=0)
+
+
+# ========================
+#  Email Job (trigger-based)
+# ========================
+
+class TriggerEmailResponse(BaseModel):
+    """Response from POST /trigger-emails."""
+    status: str
+    message: str
+
+
+class EmailJobStatusResponse(BaseModel):
+    """Response from GET /email-job-status."""
+    status: str
+    phase: str = Field(default="", description="Current phase: starting, reading_posts, extracting_emails, deduplicating, sending, done")
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+    message: str = ""
+    total_emails_found: int = 0
+    total_to_send: int = 0
+    duplicates_skipped: int = 0
+    company_matches_skipped: int = 0
+    sent: int = 0
+    failed: int = 0
+    failed_details: list[dict] = Field(default_factory=list)
+    current: int = Field(default=0, description="Current email index being sent")
+    current_email: str = Field(default="", description="Email address currently being sent to")
+

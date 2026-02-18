@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.config import STORE_IN_CSV, STORE_IN_DB
 from app.storage import csv_storage, db_storage
 from app.storage.csv_storage import generate_content_hash
-from app.models.schemas import LinkedInPostData, EmailStatusUpdate
+from app.models.schemas import LinkedInPostData
 
 
 # ========================
@@ -127,43 +127,4 @@ def process_post_batch(
         "duplicates_skipped": duplicates_skipped,
         "saved_to_db": db_count,
         "saved_to_csv": csv_count,
-    }
-
-
-# ========================
-#  Email Status Processing
-# ========================
-
-def process_email_status(
-    update: EmailStatusUpdate,
-    db: Session | None = None,
-) -> dict:
-    """
-    Processes an email delivery status update with dual storage.
-
-    Returns a summary dict.
-    """
-    now = datetime.now(timezone.utc)
-
-    status_dict = {
-        "recipient_email": update.recipient_email.strip().lower(),
-        "status": update.status,
-        "author": update.author,
-        "error_message": update.error_message,
-        "updated_at": now,
-    }
-
-    if STORE_IN_DB and db is not None:
-        db_storage.save_email_status(db, status_dict)
-
-    if STORE_IN_CSV:
-        csv_row = dict(status_dict)
-        csv_row["updated_at"] = csv_row["updated_at"].isoformat()
-        csv_storage.save_email_status(csv_row)
-
-    return {
-        "recipient_email": status_dict["recipient_email"],
-        "status": status_dict["status"],
-        "stored_in_db": STORE_IN_DB,
-        "stored_in_csv": STORE_IN_CSV,
     }

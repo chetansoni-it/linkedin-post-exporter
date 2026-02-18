@@ -14,7 +14,6 @@ from sqlalchemy import (
     String,
     Text,
     DateTime,
-    UniqueConstraint,
     Index,
 )
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
@@ -61,22 +60,6 @@ class LinkedInPost(Base):
 
     __table_args__ = (
         Index("ix_linkedin_posts_author", "author"),
-    )
-
-
-class EmailStatus(Base):
-    """Tracks email delivery statuses linked to scraped data."""
-    __tablename__ = "email_statuses"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    recipient_email = Column(String(320), nullable=False, index=True)
-    status = Column(String(50), nullable=False)
-    author = Column(String(255), nullable=False, default="")
-    error_message = Column(Text, nullable=True)
-    updated_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-
-    __table_args__ = (
-        UniqueConstraint("recipient_email", name="uq_email_status_recipient"),
     )
 
 
