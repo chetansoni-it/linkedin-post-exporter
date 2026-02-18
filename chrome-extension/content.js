@@ -152,6 +152,7 @@ function extractJobs(MAX_POSTS) {
     }
 
     sendCSV(results);
+    sendToAPI(results);
 }
 
 /* ================= CSV ================= */
@@ -172,4 +173,60 @@ function sendCSV(data) {
         type: "DOWNLOAD_CSV",
         url
     });
+}
+
+/* ================= API BATCH SENDER ================= */
+
+async function sendToAPI(data) {
+    if (!CONFIG.ENABLE_API_SEND) {
+        console.log("[LinkedIn Exporter] API sending is disabled in config.");
+        return;
+    }
+
+    const url = `${CONFIG.API_BASE_URL}${CONFIG.API_ENDPOINT}`;
+    const batchSize = CONFIG.BATCH_SIZE;
+    const totalBatches = Math.ceil(data.length / batchSize);
+
+    console.log(
+        `[LinkedIn Exporter] Sending ${data.length} posts to API in ${totalBatches} batch(es) of ${batchSize}...`
+    );
+
+    for (let i = 0; i < totalBatches; i++) {
+        const batch = data.slice(i * batchSize, (i + 1) * batchSize);
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.API_TIMEOUT_MS);
+
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ batch_number: i + 1, total_batches: totalBatches, posts: batch }),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                console.log(`[LinkedIn Exporter] Batch ${i + 1}/${totalBatches} sent successfully.`);
+            } else {
+                console.warn(
+                    `[LinkedIn Exporter] Batch ${i + 1}/${totalBatches} failed — HTTP ${response.status}`
+                );
+            }
+        } catch (err) {
+            if (err.name === "AbortError") {
+                console.warn(`[LinkedIn Exporter] Batch ${i + 1}/${totalBatches} timed out.`);
+            } else {
+                console.error(`[LinkedIn Exporter] Batch ${i + 1}/${totalBatches} error:`, err);
+            }
+        }
+
+        // Delay between batches to avoid overwhelming the server
+        if (i < totalBatches - 1) {
+            await sleep(CONFIG.BATCH_DELAY_MS);
+        }
+    }
+
+    console.log("[LinkedIn Exporter] All batches sent.");
 }
